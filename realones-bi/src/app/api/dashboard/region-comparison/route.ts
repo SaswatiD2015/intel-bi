@@ -1,37 +1,22 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import prisma from '@/lib/db';
 
 export async function GET() {
   try {
     const session = await auth();
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
-
-    const result: { region: string; revenue: number; orders: bigint; profit: number }[] = await prisma.$queryRaw`
-      SELECT 
-        r.name as region,
-        SUM(oi.quantity * oi.unit_price) as revenue,
-        COUNT(DISTINCT o.id) as orders,
-        SUM(oi.quantity * oi.unit_price) - SUM(oi.quantity * p.cost_price) as profit
-      FROM orders o
-      JOIN order_items oi ON o.id = oi.order_id
-      JOIN regions r ON o.region_id = r.id
-      JOIN products p ON oi.product_id = p.id
-      WHERE o.status = 'completed'
-      GROUP BY r.name
-      ORDER BY revenue DESC
-    `;
-
-    return NextResponse.json(result.map(r => ({
-      region: r.region,
-      revenue: Math.round(Number(r.revenue)),
-      orders: Number(r.orders),
-      profit: Math.round(Number(r.profit)),
-    })));
+    
+    const user = session.user as Record<string, any>;
+    
+    const res = await fetch('http://localhost:4000/api/v1/dashboard/region-comparison', {
+      headers: { 'Authorization': `Bearer ${user.backendToken}` }
+    });
+    
+    const data = await res.json();
+    return NextResponse.json(data.data);
   } catch (error) {
-    console.error('Region comparison error:', error);
-    return NextResponse.json([], { status: 500 });
+    return NextResponse.json({ success: false, error: 'Failed to fetch region comparison' }, { status: 500 });
   }
 }

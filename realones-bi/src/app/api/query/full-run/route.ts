@@ -32,10 +32,15 @@ export async function POST(request: NextRequest) {
        });
     }
 
+    const userRecord = session.user as Record<string, any>;
+    
     // Proxy to Fastify Backend
     const backendRes = await fetch('http://localhost:4000/api/v1/query/full-run', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${userRecord.backendToken}`
+      },
       body: JSON.stringify({ question, clarificationAnswers })
     });
 
@@ -65,9 +70,20 @@ export async function POST(request: NextRequest) {
          ...data.realCheckCard,
          assumptions: data.realCheckCard?.assumptions || []
       },
-      insight: data.insight,
+      insight: data.insight ? {
+        headline: data.insight.headline,
+        summary: data.insight.summary,
+        key_findings: data.insight.keyFindings || [],
+        drivers_or_associations: data.insight.driversOrAssociations || [],
+        recommended_next_questions: data.insight.recommendedNextQuestions || [],
+        confidence: data.insight.confidence,
+        confidence_reason: data.insight.confidenceReason,
+        assumptions: data.insight.assumptions || [],
+        limitations: data.insight.limitations || [],
+        causality_notice: data.insight.causalityNotice
+      } : null,
       dataVibeStatus: data.realCheckCard?.dataQuality?.status,
-      realScore: data.realCheckCard?.realScore?.score === 'HIGH' ? 95 : 75,
+      realScore: data.realCheckCard?.realScore?.score || 'HIGH',
       auditId: data.queryRunId
     });
   } catch (error) {

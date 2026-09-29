@@ -56,9 +56,8 @@ export class SqlValidatorService {
       const tableList = this.parser.tableList(sql, { database: 'postgresql' });
       
       for (const tableEntry of tableList) {
-        // tableEntry format: ["select", "db", "table", "alias"] or something similar
-        // For Postgres usually ["type", "db", "table"] or ["type", "table"]
-        const tableName = tableEntry.length > 2 ? tableEntry[2] : tableEntry[1];
+        const parts = typeof tableEntry === 'string' ? tableEntry.split('::') : tableEntry;
+        const tableName = parts.length === 3 ? parts[2] : parts[1];
         
         if (!tableName) continue;
         

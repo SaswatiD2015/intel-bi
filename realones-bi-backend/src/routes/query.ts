@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma, logger } from '../index';
 import { MockAIProvider } from '../lib/ai/provider';
+import { GeminiAIProvider } from '../lib/ai/gemini';
 import { SqlValidatorService } from '../lib/sql/validator';
 import { randomUUID } from 'crypto';
 
@@ -17,18 +18,20 @@ const FullRunRequestSchema = z.object({
 });
 
 export async function queryRoutes(server: FastifyInstance) {
-  const aiProvider = new MockAIProvider();
+  const aiProvider = process.env.GEMINI_API_KEY 
+    ? new GeminiAIProvider(process.env.GEMINI_API_KEY)
+    : new MockAIProvider();
   const sqlValidator = new SqlValidatorService();
 
-  server.post('/full-run', async (request: FastifyRequest, reply: FastifyReply) => {
+  server.post('/full-run', { preValidation: [server.authenticate] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body = FullRunRequestSchema.parse(request.body);
       const requestId = randomUUID();
       
-      // Mock Auth Context
-      const userId = 'user-123';
-      const role = 'BUSINESS_USER';
-      const regionScope = ['South'];
+      const user: any = request.user;
+      const userId = user.id;
+      const role = user.roles[0];
+      const regionScope = user.regions.map((r: any) => r.name);
 
       logger.info({ requestId, question: body.question }, 'Starting full-run query orchestration');
 

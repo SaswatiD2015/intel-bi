@@ -1,5 +1,6 @@
 import fastify from 'fastify';
 import cors from '@fastify/cors';
+import authPlugin from './plugins/auth';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import swagger from '@fastify/swagger';
@@ -76,10 +77,19 @@ export const buildServer = async () => {
   server.get('/', async () => {
     return { message: 'RealOnes BI API running' };
   });
-  
+  // Register Auth Plugin
+  server.register(authPlugin);
+
   // Register API Routes
   server.register(async (api) => {
+     const { authRoutes } = await import('./routes/auth');
+     const { dashboardRoutes } = await import('./routes/dashboard');
+     const { realityCheckRoutes } = await import('./routes/realityCheck');
      const { queryRoutes } = await import('./routes/query');
+     
+     api.register(authRoutes, { prefix: '/auth' });
+     api.register(dashboardRoutes, { prefix: '/dashboard' });
+     api.register(realityCheckRoutes, { prefix: '/reality-check' });
      api.register(queryRoutes, { prefix: '/query' });
   }, { prefix: '/api/v1' });
 

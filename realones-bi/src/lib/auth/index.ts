@@ -6,16 +6,7 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
-
-// Simple hash comparison for demo (in production, use bcrypt)
-async function verifyPassword(plain: string, hash: string): Promise<boolean> {
-  // For demo, we store passwords as simple hashes
-  // In production, use bcrypt.compare
-  const { createHash } = await import('crypto');
-  const hashed = createHash('sha256').update(plain).digest('hex');
-  return hashed === hash;
-}
+// Simple hash comparison removed, using Fastify backend
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
@@ -28,33 +19,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const email = credentials.email as string;
-        const password = credentials.password as string;
-
         try {
-          const user = await prisma.user.findUnique({
-            where: { email },
-            include: {
-              userRoles: { include: { role: true } },
-              regionAccess: { include: { region: true } },
-            },
+          const res = await fetch('http://localhost:4000/api/v1/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: credentials.email,
+              password: credentials.password
+            })
           });
 
-          if (!user) return null;
+          const data = await res.json();
 
-          const isValid = await verifyPassword(password, user.passwordHash);
-          if (!isValid) return null;
+          if (!res.ok || !data.success) {
+            return null;
+          }
 
+          // Return user and the fastify token
           return {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            roles: user.userRoles.map(ur => ur.role.name),
-            regions: user.regionAccess.map(ra => ({
-              id: ra.region.id,
-              name: ra.region.name,
-              code: ra.region.code,
-            })),
+            id: data.user.id,
+            email: data.user.email,
+            name: data.user.name,
+            roles: data.user.roles,
+            backendToken: data.token,
           };
         } catch (error) {
           console.error('Auth error:', error);
@@ -68,7 +55,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id;
         token.roles = (user as Record<string, unknown>).roles;
-        token.regions = (user as Record<string, unknown>).regions;
+        token.backendToken = (user as Record<string, unknown>).backendToken;
       }
       return token;
     },
@@ -77,7 +64,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.id = token.id as string;
         const userRecord = session.user as unknown as Record<string, unknown>;
         userRecord.roles = token.roles;
-        userRecord.regions = token.regions;
+        userRecord.backendToken = token.backendToken;
       }
       return session;
     },

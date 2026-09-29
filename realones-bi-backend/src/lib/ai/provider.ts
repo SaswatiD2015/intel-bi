@@ -91,10 +91,10 @@ export class MockAIProvider implements AIProvider {
   async generateSQL(input: SQLGenerationPromptInput): Promise<SqlGenerationOutput> {
     // Generate Postgres specific SQL
     let sql = `
-      SELECT r.name as region, SUM(oi.quantity * oi.unit_price) as revenue
+      SELECT r.name as region, SUM(oi.quantity * oi."unitPrice") as revenue
       FROM orders o
-      JOIN order_items oi ON o.id = oi.order_id
-      JOIN regions r ON o.region_id = r.id
+      JOIN order_items oi ON o.id = oi."orderId"
+      JOIN regions r ON o."regionId" = r.id
       WHERE o.status = 'COMPLETED'
       GROUP BY r.name
       ORDER BY revenue DESC
