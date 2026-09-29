@@ -1,0 +1,448 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// ============================================================================
+// AUTH & ACCESS
+// ============================================================================
+
+model User {
+  id             String           @id @default(uuid())
+  email          String           @unique
+  passwordHash   String           @map("password_hash")
+  name           String
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  userRoles      UserRole[]
+  regionAccess   UserRegionAccess[]
+  auditLogs      AuditLog[]
+  feedback       UserFeedback[]
+  decisionReviews DecisionReview[]
+  savedQuestions SavedQuestion[]
+  queryRuns      QueryRun[]
+
+  @@map("users")
+}
+
+model Role {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  description String?
+  userRoles UserRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  roleId String @map("role_id")
+  user   User   @relation(fields: [userId], references: [id])
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+model Region {
+  id        String             @id @default(uuid())
+  name      String             @unique
+  code      String             @unique
+  createdAt DateTime           @default(now()) @map("created_at")
+  access    UserRegionAccess[]
+  customers Customer[]
+  orders    Order[]
+  salesTargets SalesTarget[]
+
+  @@map("regions")
+}
+
+model UserRegionAccess {
+  id       String @id @default(uuid())
+  userId   String @map("user_id")
+  regionId String @map("region_id")
+  user     User   @relation(fields: [userId], references: [id])
+  region   Region @relation(fields: [regionId], references: [id])
+
+  @@unique([userId, regionId])
+  @@map("user_region_access")
+}
+
+// ============================================================================
+// COMMERCE
+// ============================================================================
+
+model Customer {
+  id           String    @id @default(uuid())
+  customerId   String    @unique @map("customer_id")
+  firstName    String    @map("first_name")
+  lastName     String    @map("last_name")
+  email        String
+  phone        String?
+  address      String?
+  city         String?
+  regionId     String    @map("region_id")
+  region       Region    @relation(fields: [regionId], references: [id])
+  segment      String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  orders       Order[]
+  churnScore   CustomerChurnScore?
+
+  @@map("customers")
+}
+
+model ProductCategory {
+  id       String    @id @default(uuid())
+  name     String    @unique
+  slug     String    @unique
+  products Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id          String          @id @default(uuid())
+  productId   String          @unique @map("product_id")
+  name        String
+  categoryId  String          @map("category_id")
+  category    ProductCategory @relation(fields: [categoryId], references: [id])
+  unitPrice   Decimal         @map("unit_price") 
+  costPrice   Decimal         @map("cost_price") 
+  createdAt   DateTime        @default(now()) @map("created_at")
+  orderItems  OrderItem[]
+
+  @@map("products")
+}
+
+model Order {
+  id           String      @id @default(uuid())
+  orderId      String      @unique @map("order_id")
+  customerId   String      @map("customer_id")
+  customer     Customer    @relation(fields: [customerId], references: [id])
+  regionId     String      @map("region_id")
+  region       Region      @relation(fields: [regionId], references: [id])
+  status       String      // completed, pending, cancelled, returned
+  orderDate    DateTime    @map("order_date")
+  discount     Decimal     @default(0) 
+  createdAt    DateTime    @default(now()) @map("created_at")
+  dataLoadedAt DateTime?   @map("data_loaded_at")
+  orderItems   OrderItem[]
+  returns      Return[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String  @map("order_id")
+  order     Order   @relation(fields: [orderId], references: [id])
+  productId String  @map("product_id")
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Decimal @map("unit_price") 
+
+  @@map("order_items")
+}
+
+model Return {
+  id             String   @id @default(uuid())
+  orderId        String   @map("order_id")
+  order          Order    @relation(fields: [orderId], references: [id])
+  returnDate     DateTime @map("return_date")
+  reason         String?
+  refundAmount   Decimal  @map("refund_amount") 
+  quantityReturned Int    @map("quantity_returned")
+
+  @@map("returns")
+}
+
+model SalesTarget {
+  id         String   @id @default(uuid())
+  regionId   String   @map("region_id")
+  region     Region   @relation(fields: [regionId], references: [id])
+  year       Int
+  month      Int
+  targetAmount Decimal @map("target_amount") 
+
+  @@unique([regionId, year, month])
+  @@map("sales_targets")
+}
+
+model CustomerChurnScore {
+  id          String   @id @default(uuid())
+  customerId  String   @unique @map("customer_id")
+  customer    Customer @relation(fields: [customerId], references: [id])
+  churnScore  Decimal  @map("churn_score") 
+  riskLevel   String   @map("risk_level") // high, medium, low
+  computedAt  DateTime @map("computed_at")
+  factors     String?  // JSON string of contributing factors
+
+  @@map("customer_churn_scores")
+}
+
+// ============================================================================
+// SEMANTIC LAYER
+// ============================================================================
+
+model BusinessGlossary {
+  id          String   @id @default(uuid())
+  term        String   @unique
+  definition  String
+  category    String?
+  owner       String?
+  status      String   @default("approved") // approved, draft, deprecated
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("business_glossary")
+}
+
+model MetricDefinition {
+  id               String            @id @default(uuid())
+  name             String            @unique
+  slug             String            @unique
+  definition       String
+  formula          String
+  sourceTables     String            @map("source_tables") // JSON array
+  sourceColumns    String            @map("source_columns") // JSON array
+  filters          String?           // JSON object
+  grain            String?           // e.g., "order-level", "monthly"
+  owner            String?
+  version          Int               @default(1)
+  status           String            @default("approved")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  synonyms         MetricSynonym[]
+  dimensions       MetricDimension[]
+
+  @@map("metric_definitions")
+}
+
+model MetricSynonym {
+  id         String           @id @default(uuid())
+  metricId   String           @map("metric_id")
+  metric     MetricDefinition @relation(fields: [metricId], references: [id])
+  synonym    String
+
+  @@unique([metricId, synonym])
+  @@map("metric_synonyms")
+}
+
+model MetricDimension {
+  id         String           @id @default(uuid())
+  metricId   String           @map("metric_id")
+  metric     MetricDefinition @relation(fields: [metricId], references: [id])
+  dimension  String
+  columnRef  String           @map("column_ref")
+
+  @@map("metric_dimensions")
+}
+
+model SchemaTable {
+  id          String         @id @default(uuid())
+  tableName   String         @unique @map("table_name")
+  description String?
+  isAllowed   Boolean        @default(true) @map("is_allowed")
+  columns     SchemaColumn[]
+
+  @@map("schema_tables")
+}
+
+model SchemaColumn {
+  id           String      @id @default(uuid())
+  tableId      String      @map("table_id")
+  table        SchemaTable @relation(fields: [tableId], references: [id])
+  columnName   String      @map("column_name")
+  dataType     String      @map("data_type")
+  description  String?
+  isPII        Boolean     @default(false) @map("is_pii")
+  isAllowed    Boolean     @default(true) @map("is_allowed")
+
+  @@unique([tableId, columnName])
+  @@map("schema_columns")
+}
+
+model SchemaRelationship {
+  id              String @id @default(uuid())
+  sourceTable     String @map("source_table")
+  sourceColumn    String @map("source_column")
+  targetTable     String @map("target_table")
+  targetColumn    String @map("target_column")
+  relationshipType String @map("relationship_type") // one-to-many, many-to-one, etc.
+
+  @@map("schema_relationships")
+}
+
+model ApprovedJoinPath {
+  id          String @id @default(uuid())
+  name        String
+  tables      String // JSON array of table names
+  joinClause  String @map("join_clause")
+  description String?
+  isActive    Boolean @default(true) @map("is_active")
+
+  @@map("approved_join_paths")
+}
+
+model ApprovedQueryExample {
+  id           String   @id @default(uuid())
+  question     String
+  metricUsed   String?  @map("metric_used")
+  sql          String
+  explanation  String?
+  tags         String?  // JSON array
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("approved_query_examples")
+}
+
+// ============================================================================
+// GOVERNANCE
+// ============================================================================
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  userId         String?  @map("user_id")
+  user           User?    @relation(fields: [userId], references: [id])
+  action         String
+  category       String   // auth, query, feedback, decision, governance
+  details        String?   // JSON
+  ipAddress      String?  @map("ip_address")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model UserFeedback {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id])
+  queryRunId  String?  @map("query_run_id")
+  queryRun    QueryRun? @relation(fields: [queryRunId], references: [id])
+  rating      Int      // 1-5
+  feedbackType String  @map("feedback_type") // accurate, misleading, wrong, unclear
+  comment     String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("user_feedback")
+}
+
+model DecisionReview {
+  id               String    @id @default(uuid())
+  userId           String    @map("user_id")
+  user             User      @relation(fields: [userId], references: [id])
+  queryRunId       String?   @map("query_run_id")
+  queryRun         QueryRun? @relation(fields: [queryRunId], references: [id])
+  title            String
+  businessQuestion String    @map("business_question")
+  businessContext  String?   @map("business_context")
+  decisionTaken    String    @map("decision_taken")
+  decisionOwner    String?   @map("decision_owner")
+  expectedOutcome  String?   @map("expected_outcome")
+  expectedImpact   String?   @map("expected_impact")
+  actualOutcome    String?   @map("actual_outcome")
+  actualImpact     String?   @map("actual_impact")
+  reviewDate       DateTime? @map("review_date")
+  aiUsefulnessRating Int?    @map("ai_usefulness_rating")
+  qualityScore     Int?      @map("quality_score")
+  notes            String?
+  status           String    @default("pending") // pending, reviewed, closed
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@map("decision_reviews")
+}
+
+model SavedQuestion {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id])
+  question   String
+  queryRunId String?  @map("query_run_id")
+  queryRun   QueryRun? @relation(fields: [queryRunId], references: [id])
+  tags       String?  // JSON array
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("saved_questions")
+}
+
+model QueryRun {
+  id                String    @id @default(uuid())
+  userId            String    @map("user_id")
+  user              User      @relation(fields: [userId], references: [id])
+  question          String
+  normalizedQuestion String?  @map("normalized_question")
+  queryPlan         String?   @map("query_plan")  // JSON
+  generatedSql      String?   @map("generated_sql") 
+  sqlValidation     String?   @map("sql_validation")  // JSON
+  executionResult   String?   @map("execution_result")  // JSON
+  dataQualityResult String?   @map("data_quality_result")  // JSON
+  realScore         String?   @map("real_score")
+  realScoreReason   String?   @map("real_score_reason") 
+  insightString       String?   @map("insight_json") 
+  dataVibeStatus    String?   @map("data_vibe_status")
+  status            String    @default("pending") // pending, completed, failed, blocked
+  errorMessage      String?   @map("error_message") 
+  executionTimeMs   Int?      @map("execution_time_ms")
+  rowCount          Int?      @map("row_count")
+  modelName         String?   @map("model_name")
+  tokenUsage        Int?      @map("token_usage")
+  estimatedCost     Decimal?  @map("estimated_cost") 
+  modelLatencyMs    Int?      @map("model_latency_ms")
+  cacheHit          Boolean   @default(false) @map("cache_hit")
+  promptVersion     String?   @map("prompt_version")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  feedback          UserFeedback[]
+  decisionReviews   DecisionReview[]
+  savedQuestions    SavedQuestion[]
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("query_runs")
+}
+
+model DataQualityRun {
+  id          String   @id @default(uuid())
+  tableName   String   @map("table_name")
+  checkType   String   @map("check_type")
+  checkName   String   @map("check_name")
+  status      String   // good, needs_attention, high_risk
+  details     String?   // JSON
+  value       Decimal? 
+  threshold   Decimal? 
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("data_quality_runs")
+}
+
+model ModelUsageMetric {
+  id              String   @id @default(uuid())
+  modelName       String   @map("model_name")
+  operation       String   // plan, generate_sql, insight
+  tokenUsage      Int      @map("token_usage")
+  estimatedCost   Decimal  @map("estimated_cost") 
+  latencyMs       Int      @map("latency_ms")
+  success         Boolean
+  errorMessage    String?  @map("error_message")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("model_usage_metrics")
+}
+
+model AppSetting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String
+  description String?
+
+  @@map("app_settings")
+}

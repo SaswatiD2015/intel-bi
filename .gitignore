@@ -1,0 +1,22 @@
+# Ignore all node_modules in any subfolder
+**/node_modules/
+**/dist/
+
+# Next.js build output
+.next/
+out/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Prisma SQLite local databases
+*.db
+*.db-journal
+
+# OS files
+.DS_Store
+Thumbs.db
