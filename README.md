@@ -1,3 +1,10 @@
+## Error Type
+Console ClientFetchError
+
+## Error Message
+Read more at https://errors.authjs.dev#autherror
+
+Next.js version: 16.3.7 (Turbopack)
 # 📊 RealOnes BI (intel-bi)
 
 An AI-powered Business Intelligence platform that allows non-technical executives and managers to query complex relational database records using plain English.

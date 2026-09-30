@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { prisma, logger } from '../index';
 import { MockAIProvider } from '../lib/ai/provider';
+import { GroqAIProvider } from '../lib/ai/groq';
 import { GeminiAIProvider } from '../lib/ai/gemini';
 import { SqlValidatorService } from '../lib/sql/validator';
 import { randomUUID } from 'crypto';
@@ -18,9 +19,11 @@ const FullRunRequestSchema = z.object({
 });
 
 export async function queryRoutes(server: FastifyInstance) {
-  const aiProvider = process.env.GEMINI_API_KEY 
-    ? new GeminiAIProvider(process.env.GEMINI_API_KEY)
-    : new MockAIProvider();
+  const aiProvider = process.env.GROQ_API_KEY
+    ? new GroqAIProvider(process.env.GROQ_API_KEY)
+    : process.env.GEMINI_API_KEY 
+      ? new GeminiAIProvider(process.env.GEMINI_API_KEY)
+      : new MockAIProvider();
   const sqlValidator = new SqlValidatorService();
 
   server.post('/full-run', { preValidation: [server.authenticate] }, async (request: FastifyRequest, reply: FastifyReply) => {
